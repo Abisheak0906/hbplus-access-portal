@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "802280960573",
+    "project_id": "hbplus-access-portal-1afd6",
+    "storage_bucket": "hbplus-access-portal-1afd6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:802280960573:android:7d4dae51e2da115037b054",
+        "android_client_info": {
+          "package_name": "com.hbplus.accessportal"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "802280960573-nntks5r50n64005pp7ndou4cjuciaa3c.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBntCemTH8xZj18b831mKqXi8jyrtJjdY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "802280960573-nntks5r50n64005pp7ndou4cjuciaa3c.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "802280960573-2j8j7o67u9em6d3amuvf6ui6so8jqv4p.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.hbplus.accessportal"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -11,9 +11,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useGoogleAuth } from '../hooks/use-google-auth';
 
 import {
-  loginWithGoogle,
+  isAuthorizedUser,
   logout,
   subscribeToAuth,
 } from '../config/auth';
@@ -23,14 +24,12 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const { login: googleLogin, ready: googleReady } = useGoogleAuth();
 
   useEffect(() => {
     const unsubscribe = subscribeToAuth(async (currentUser) => {
       if (currentUser) {
-        const email = currentUser.email?.trim().toLowerCase();
-        const allowed =
-          currentUser.emailVerified &&
-          email?.endsWith('@hbplus.fit');
+        const allowed = isAuthorizedUser(currentUser);
 
         if (!allowed) {
           await logout();
@@ -57,25 +56,16 @@ export default function HomeScreen() {
     setError('');
 
     try {
-      const signedInUser = await loginWithGoogle();
+      const signedInUser = await googleLogin();
       setUser(signedInUser);
-    
     } catch (err: unknown) {
-      const firebaseError = err as {
-        code?: string;
-        message?: string;
-      };
-
-      console.error('Google sign-in error:', err);
-
+      const firebaseError = err as { message?: string };
       setError(
-        firebaseError.message ||
-        'Authentication failed. Please try again.'
+        firebaseError.message || 'Google sign-in failed. Please try again.'
       );
     } finally {
       setBusy(false);
     }
-
   }
 
   async function handleLogout() {
@@ -180,7 +170,9 @@ export default function HomeScreen() {
             </Text>
             <Text style={styles.profileEmail}>{user.email}</Text>
             <Text style={styles.profileDomain}>
-              Official company account
+              {user.email?.toLowerCase().endsWith('@hbplus.fit')
+                ? '✓ Official company account'
+                : '✓ Development test account'}
             </Text>
           </View>
         </View>
@@ -215,7 +207,7 @@ export default function HomeScreen() {
         <Pressable
           style={[styles.button, busy && styles.disabled]}
           onPress={handleLogin}
-          disabled={busy}
+          disabled={busy || !googleReady}
         >
           {busy ? (
             <ActivityIndicator color="#FFFFFF" />

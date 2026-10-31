@@ -1,15 +1,24 @@
 
 import {
-    GoogleAuthProvider,
-    onAuthStateChanged,
-    signInWithPopup,
-    signOut,
-    type User,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithCredential,
+  signInWithPopup,
+  signOut,
+  type User,
 } from 'firebase/auth';
 
 import { auth } from './firebase';
 
-const ALLOWED_DOMAIN = 'hbplus.fit';
+export function isAuthorizedUser(user: User): boolean {
+  const email = user.email?.trim().toLowerCase();
+
+  if (!email || !user.emailVerified) {
+    return false;
+  }
+
+  return email.endsWith('@hbplus.fit');
+}
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -21,16 +30,26 @@ export async function loginWithGoogle(): Promise<User> {
   const result = await signInWithPopup(auth, googleProvider);
   const user = result.user;
 
-  const email = user.email?.trim().toLowerCase();
-
-  if (
-    !email ||
-    !user.emailVerified ||
-    email.split('@').length !== 2 ||
-    email.split('@')[1] !== ALLOWED_DOMAIN
-  ) {
+  if (!isAuthorizedUser(user)) {
     await signOut(auth);
+    throw new Error(
+      'Access restricted. Please login using your official domain email.'
+    );
+  }
 
+  return user;
+}
+
+export async function loginWithGoogleIdToken(
+  idToken: string
+): Promise<User> {
+  const credential = GoogleAuthProvider.credential(idToken);
+  const result = await signInWithCredential(auth, credential);
+
+  const user = result.user;
+
+  if (!isAuthorizedUser(user)) {
+    await signOut(auth);
     throw new Error(
       'Access restricted. Please login using your official domain email.'
     );
