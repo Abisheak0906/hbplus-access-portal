@@ -147,7 +147,7 @@ The common check is a suffix check for `@hbplus.fit`; the native sign-in path ad
 
 ## Dashboard and route protection
 
-The dashboard is a conditional view inside `src/app/index.tsx`, not a separate route. It is rendered only after Firebase reports an authorized user. This implementation does **not** define a route-group guard or a reusable protected-route component. The `/explore` route is an Expo starter screen and is not gated by authentication. Do not treat client-side route/UI checks as protection for server data or APIs.
+The root screen in `src/app/index.tsx` subscribes to Firebase Authentication state, checks the current user, and only shows the dashboard when the user is authorized. The dashboard is a conditional view on `/`, not a separate route. The `/explore` route redirects to `/`. There is no reusable route-group guard for future protected pages. Do not treat client-side route/UI checks as protection for server data or APIs.
 
 ## Cross-platform UI
 
@@ -198,19 +198,25 @@ After installing a development build, run `npx expo start` to connect it to the 
 
 ### Netlify
 
-For a Netlify site connected to the GitHub repository, configure:
+The current deployment uses manual Netlify Drop:
 
-- **Build command:** `npm ci && npx expo export --platform web`
-- **Publish directory:** `dist`
+- Build the static web export:
 
-Add the deployed hostname to Firebase Authentication's authorized domains and to the relevant Google OAuth web-client configuration. The supplied live deployment URL is [https://tangerine-tapioca-a65ba5.netlify.app](https://tangerine-tapioca-a65ba5.netlify.app/).
+  ```bash
+  npx expo export --platform web
+  ```
+
+- Upload the complete `dist/` folder using Netlify Drop.
+
+The live deployment is [https://tangerine-tapioca-a65ba5.netlify.app/](https://tangerine-tapioca-a65ba5.netlify.app/). Add the deployed hostname to Firebase Authentication's authorized domains and to the relevant Google OAuth web-client configuration.
 
 ## Validation and limitations
 
 - `npm run lint` — passed.
 - `npx tsc --noEmit` — passed.
+- `npx expo-doctor` — passed all 20/20 checks after dependency updates.
 - No unit or end-to-end test script or test files are present in the repository. These checks do not exercise Google OAuth or Firebase sign-in.
-- No `@hbplus.fit` test account was available, so successful company-account authentication has not been verified.
+- No company test account was provided, so successful `@hbplus.fit` authentication has not been verified.
 - The project has no application backend, role-based authorization, or application database/storage implementation.
 - Email-domain authorization is enforced in client code. It is useful for controlling this UI but is not a server-side security boundary. Any backend or protected data service must independently verify Firebase ID tokens and enforce access rules server-side.
 - Native iOS Google OAuth setup and release signing must be completed for the target environment before an iOS release.
