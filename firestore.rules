@@ -1,0 +1,83 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function verifiedCompanyAccount() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string
+        && request.auth.token.email.matches(
+          '^[^@]+@[hH][bB][pP][lL][uU][sS][.][fF][iI][tT]$'
+        );
+    }
+
+    function isAdmin() {
+      return verifiedCompanyAccount()
+        && request.auth.token.admin == true;
+    }
+
+    function isValidProfile(profile, uid) {
+      return profile.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'role',
+          'createdAt',
+          'lastLoginAt'
+        ])
+        && profile.keys().hasAll([
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'role',
+          'createdAt',
+          'lastLoginAt'
+        ])
+        && profile.uid == uid
+        && profile.email == request.auth.token.email
+        && (profile.displayName == null || profile.displayName is string)
+        && (profile.photoURL == null || profile.photoURL is string)
+        && (profile.role == 'admin' || profile.role == 'user')
+        && profile.createdAt is timestamp
+        && profile.lastLoginAt == request.time;
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn()
+        && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if verifiedCompanyAccount()
+        && request.auth.uid == uid
+        && isValidProfile(request.resource.data, uid)
+        && request.resource.data.role == 'user'
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if verifiedCompanyAccount()
+        && request.auth.uid == uid
+        && isValidProfile(request.resource.data, uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'lastLoginAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

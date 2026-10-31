@@ -10,10 +10,12 @@ import {
   type User,
 } from 'firebase/auth';
 
-import { loginWithGoogle as loginWithGoogleWeb } from '../config/auth';
+import {
+  isAuthorizedUser,
+  loginWithGoogle as loginWithGoogleWeb,
+} from '../config/auth';
 import { auth } from '../config/firebase';
-
-const ALLOWED_DOMAIN = 'hbplus.fit';
+import { saveUserProfile } from '../services/user-profile';
 
 if (Platform.OS !== 'web') {
   GoogleSignin.configure({
@@ -46,14 +48,7 @@ export function useGoogleAuth() {
     const signedIn = await signInWithCredential(auth, credential);
     const user = signedIn.user;
 
-    const email = user.email?.trim().toLowerCase();
-
-    if (
-      !email ||
-      !user.emailVerified ||
-      email.split('@').length !== 2 ||
-      email.split('@')[1] !== ALLOWED_DOMAIN
-    ) {
+    if (!isAuthorizedUser(user)) {
       await signOut(auth);
       await GoogleSignin.signOut();
       throw new Error(
@@ -61,6 +56,7 @@ export function useGoogleAuth() {
       );
     }
 
+    await saveUserProfile(user);
     return user;
   }
 

@@ -1,27 +1,31 @@
 # HB+ Access Portal
 
-HB+ Access Portal is a cross-platform sign-in portal built with Expo. It authenticates users with Google through Firebase Authentication and displays an account dashboard only when the signed-in Firebase user satisfies the portal's email checks.
+HB+ Access Portal is a web-first company sign-in portal built with Expo, React Native Web, Firebase Authentication, and Cloud Firestore. It provides Google sign-in, a user profile dashboard, and a claim-protected admin area for viewing saved profiles.
 
-## Objectives
+## Objectives and capabilities
 
-- Provide Google sign-in for the web and native Android/iOS targets.
-- Restrict the home-screen dashboard to verified `@hbplus.fit` accounts.
-- Share the application and authentication state across web and native platforms while using the platform-appropriate Google sign-in flow.
+- Authenticate through Google and Firebase Authentication.
+- Permit signed-in users only when Firebase confirms a verified `@hbplus.fit` email.
+- Save a user profile at `users/{uid}` after an authorized sign-in.
+- Show account details to users and provide claim-protected admin overview and profile-directory screens.
+- Keep authorization enforcement in Firebase Security Rules; browser route guards are navigation controls, not a server-side security boundary.
+
+The admin directory is read-only. Role changes are provisioned by a trusted local Admin SDK script, not by client-side Firestore writes. Account status, invitations, audit logs, and role-based management actions are not implemented.
 
 ## Links
 
-- **Live web deployment:** [https://tangerine-tapioca-a65ba5.netlify.app](https://tangerine-tapioca-a65ba5.netlify.app/)
+- **Live web deployment:** [https://tangerine-tapioca-a65ba5.netlify.app/](https://tangerine-tapioca-a65ba5.netlify.app/)
 - **GitHub repository:** [https://github.com/Abisheak0906/hbplus-access-portal](https://github.com/Abisheak0906/hbplus-access-portal)
 
 ## Technology
 
-- **React Native** and **React Native Web** for cross-platform UI.
-- **Expo SDK 58** for the app toolchain and platform configuration.
-- **TypeScript** with strict compiler options.
-- **Expo Router** for file-based routes.
-- **Firebase Authentication** for Firebase user sessions and Google credentials.
-- **`@react-native-google-signin/google-signin`** for native Google sign-in.
-- **EAS Build** configuration for development and production build profiles.
+- **React Native** and **React Native Web** for shared cross-platform UI components.
+- **Expo SDK 58** and **Expo Router 58** for the toolchain and file-based routes.
+- **TypeScript** for application and test code.
+- **Firebase Authentication** with Google sign-in.
+- **Cloud Firestore** for user profile documents and security rules.
+- **Firebase Admin SDK** in a local operator-only script for custom-claim provisioning.
+- **Vitest** and Firebase Emulator Suite for unit and rules tests; **Playwright** for browser route checks.
 
 ## Project structure
 
@@ -58,16 +62,33 @@ HB+ Access Portal is a cross-platform sign-in portal built with Expo. It authent
 │           ├── home.png
 │           ├── home@2x.png
 │           └── home@3x.png
+├── e2e/
+│   ├── admin-route-guard.spec.ts
+│   ├── login.spec.ts
+│   └── user-route-guard.spec.ts
 ├── scripts/
+│   ├── manage-admin-claim.cjs
 │   └── reset-project.js
 ├── src/
 │   ├── app/
+│   │   ├── (admin)/
+│   │   │   ├── _layout.tsx
+│   │   │   └── admin/
+│   │   │       ├── dashboard.tsx
+│   │   │       └── users.tsx
+│   │   ├── (auth)/
+│   │   │   ├── _layout.tsx
+│   │   │   └── login.tsx
+│   │   ├── (user)/
+│   │   │   ├── _layout.tsx
+│   │   │   └── user/dashboard.tsx
 │   │   ├── _layout.tsx
 │   │   ├── explore.tsx
 │   │   └── index.tsx
 │   ├── components/
-│   │   ├── ui/
-│   │   │   └── collapsible.tsx
+│   │   ├── admin/admin-shell.tsx
+│   │   ├── auth/auth-routing.tsx
+│   │   ├── ui/collapsible.tsx
 │   │   ├── animated-icon.module.css
 │   │   ├── animated-icon.tsx
 │   │   ├── animated-icon.web.tsx
@@ -81,148 +102,200 @@ HB+ Access Portal is a cross-platform sign-in portal built with Expo. It authent
 │   ├── config/
 │   │   ├── auth.ts
 │   │   └── firebase.ts
-│   ├── constants/
-│   │   └── theme.ts
+│   ├── constants/theme.ts
+│   ├── contexts/auth-context.tsx
 │   ├── hooks/
 │   │   ├── use-color-scheme.ts
 │   │   ├── use-color-scheme.web.ts
 │   │   ├── use-google-auth.ts
 │   │   └── use-theme.ts
+│   ├── services/user-profile.ts
 │   └── global.css
-├── .gitignore
-├── AGENTS.md
+├── tests/
+│   ├── firestore.rules.test.ts
+│   └── unit/
+│       ├── auth.test.ts
+│       └── user-profile.test.ts
 ├── app.json
 ├── eas.json
+├── firebase.json
+├── firestore.rules
 ├── eslint.config.js
 ├── expo-env.d.ts
 ├── google-services.json
 ├── LICENSE
 ├── package-lock.json
 ├── package.json
-├── README.md
-└── tsconfig.json
+├── playwright.config.ts
+├── tsconfig.json
+├── vitest.config.ts
+├── .gitignore
+└── AGENTS.md
 ```
 
-`dist/` is generated by the static web export and is not source code. The `ios/` and `android/` native projects are not checked in; Expo generates them from the app configuration when needed.
+Expo Router route groups do not appear in public URLs:
+
+| Route | Behavior |
+|---|---|
+| `/` | Redirects according to the authenticated user's effective role. |
+| `/login` | Google sign-in screen; authenticated users are redirected to their dashboard. |
+| `/user/dashboard` | User profile and account details. |
+| `/admin/dashboard` | Admin overview, including the Firestore profile count. |
+| `/admin/users` | Searchable, filterable, paginated, read-only user profile directory. |
+| `/explore` | Redirects to `/`, which then applies authentication and role routing. |
+
+The user and admin route-group layouts use a shared guard backed by `AuthProvider`. They show a loading state while authentication/profile checks run, send signed-out users to `/login`, and redirect users with the wrong effective role. Admin route access uses the Firebase ID token's trusted `admin` custom claim. A profile's `role` field is directory metadata and does not grant authorization.
 
 ## Prerequisites and installation
 
-- Node.js compatible with the installed Expo SDK and npm.
-- A Firebase project configured as described below.
-- For local Android builds: Android Studio and an Android SDK/emulator, or a connected device.
-- For local iOS builds: macOS with Xcode and an iOS simulator or connected device. EAS cloud builds are an alternative to a local native toolchain.
+- Node.js supported by the installed Expo SDK and project dependencies (Node.js 22 is recommended for the Firebase CLI toolchain).
+- npm.
+- A Firebase project with Authentication and Cloud Firestore enabled.
+- Java 21 or later for the Firestore Emulator used by rules tests.
+- Chromium for Playwright browser tests.
+- A trusted Google Cloud/Firebase operator credential, stored outside this repository, only when provisioning an admin claim.
 
-Install the locked dependencies and start the project:
+Install dependencies and run the web app:
 
 ```bash
 npm ci
-npx expo start
-```
-
-For web development, use `npx expo start --web` or select the web target from the Expo CLI. The `npm run web` script is also configured.
-
-## Firebase and Google OAuth setup
-
-1. Create or select a Firebase project and enable **Authentication → Sign-in method → Google**. Set the project support email.
-2. Register a Firebase **Web app**. Copy its Firebase web configuration into `firebaseConfig` in `src/config/firebase.ts`. That file currently contains the client configuration inline rather than reading environment variables.
-3. In Firebase Authentication's **Settings → Authorized domains**, add the development host(s) and `tangerine-tapioca-a65ba5.netlify.app`.
-4. Configure the Google OAuth consent screen and OAuth client(s) in the associated Google Cloud project. For the web client, authorize the web app's origin and the Firebase Auth handler URI shown by Firebase (normally `https://<auth-domain>/__/auth/handler`). The Firebase `authDomain` must match the configured project.
-5. In `src/hooks/use-google-auth.ts`, `GoogleSignin.configure` uses a Google **Web client ID**. Set it to the web OAuth client ID for your Firebase/Google project.
-6. For Android, register an Android app in Firebase with the configured package name `com.hbplus.accessportal`. Place the downloaded `google-services.json` at the repository root, as referenced by `app.json`. Register the signing certificate SHA fingerprints required by your debug/release builds in Firebase and refresh the configuration file when those fingerprints change.
-7. Before a native iOS release, finish the iOS-specific Google Sign-In OAuth callback/client configuration and signing setup for bundle ID `com.hbplus.accessportal`. The repository defines the bundle ID and includes the Google Sign-In config plugin, but does not include an iOS Google service configuration file or release signing credentials.
-
-The Firebase web API key, OAuth client IDs, and Android `google-services.json` identify client applications; they are not substitutes for server credentials. Never put a Firebase service-account private key or other server secret in the client app or repository.
-
-## Authentication and access flow
-
-1. The root route subscribes to Firebase Authentication state with `onAuthStateChanged`. While Firebase resolves the initial state, it shows a loading indicator and “Checking your session...”.
-2. On web, the Google button opens Firebase's `signInWithPopup` flow. On native platforms, the app invokes Google Sign-In, takes the returned ID token, creates a Firebase credential, and signs in with `signInWithCredential`.
-3. The web/shared `isAuthorizedUser` check trims the email, lowercases it, rejects a missing email or an unverified Firebase user, then requires `email.endsWith('@hbplus.fit')`. It does not allow Gmail development accounts.
-4. The native Google sign-in flow performs its own check: after trimming and lowercasing, it requires a non-empty, verified email with exactly one `@` and a domain equal to `hbplus.fit`. The root Firebase auth-state listener also applies the shared `isAuthorizedUser` check before displaying the dashboard.
-5. If a Google sign-in succeeds but the account is unauthorized, the web/shared flow signs out of Firebase before returning an access-restricted error. The native flow signs out of both Firebase and Google before rejecting the account. If an unauthorized Firebase user is found by the root auth-state listener, the app signs that user out and displays an access-restricted message.
-6. When authorized, the `/` screen renders the account dashboard with the user's available profile details and a **Sign out** control. Logout calls Firebase `signOut`; the UI displays a busy label while signing out.
-7. Login errors are displayed on the sign-in screen. Login and logout actions use a busy state to disable the relevant control and show progress; logout failures display an error message.
-
-The common check is a suffix check for `@hbplus.fit`; the native sign-in path additionally checks the domain as a separate email component. Both paths require Firebase's `emailVerified` flag.
-
-## Dashboard and route protection
-
-The root screen in `src/app/index.tsx` subscribes to Firebase Authentication state, checks the current user, and only shows the dashboard when the user is authorized. The dashboard is a conditional view on `/`, not a separate route. The `/explore` route redirects to `/`. There is no reusable route-group guard for future protected pages. Do not treat client-side route/UI checks as protection for server data or APIs.
-
-## Cross-platform UI
-
-The app uses React Native components, which React Native Web renders in the browser, and a platform-specific Google sign-in hook to choose web versus native authentication. The login card is constrained to a maximum width, dashboard content is centered with a maximum width and scrolls vertically, and dashboard statistic cards wrap on narrower screens. Expo Router supplies the root stack; the root layout also selects an Expo Router theme from the system color scheme.
-
-## Run and build
-
-### Web
-
-Start a local web session:
-
-```bash
 npx expo start --web
 ```
 
-Create the static web export:
+Alternatively, run the configured `npm run web` script. Expo Router uses `src/app/` for routes.
+
+## Firebase and Google OAuth setup
+
+1. Create or select a Firebase project. Enable **Authentication → Sign-in method → Google** and set its support email.
+2. Register a Firebase Web app. The existing web configuration is in `src/config/firebase.ts`; keep the Firebase client configuration for the intended project. It is client configuration, not an Admin SDK credential.
+3. In Firebase Authentication **Settings → Authorized domains**, add the local development hostname and `tangerine-tapioca-a65ba5.netlify.app`.
+4. Configure the Google OAuth consent screen and web OAuth client. Authorize the application origin and Firebase Auth handler URI shown in Firebase (typically `https://<auth-domain>/__/auth/handler`).
+5. Confirm that the Firebase `authDomain` and Google OAuth client belong to the same Firebase/Google Cloud project. The web flow uses Firebase `signInWithPopup`.
+6. If testing rules locally, the test command runs the Firestore Emulator with project ID `demo-hbplus-portal`; it does not target the configured production project.
+7. Review and deploy `firestore.rules` to the intended Firebase project only after verifying its project ID and rules behavior. No Firebase deployment is performed by this repository's test commands.
+
+### Firestore profile data
+
+The application stores one document per Firebase Authentication UID at `users/{uid}`:
+
+| Field | Meaning |
+|---|---|
+| `uid` | Firebase Authentication UID and Firestore document ID. |
+| `email` | Email from the signed-in Firebase user. |
+| `displayName`, `photoURL` | Profile values, or `null` when not supplied. |
+| `role` | Profile label, initially `user`; changed by the trusted local provisioning script when an admin claim is granted/revoked. It is not authoritative for access. |
+| `createdAt` | Firestore server timestamp set only when creating the profile. |
+| `lastLoginAt` | Firestore server timestamp updated after each authorized Google sign-in. |
+
+The client creates the profile only after its verified-domain check passes. Firestore rules independently enforce UID ownership, verified company email, field constraints, immutable role/creation fields for client updates, and no deletes. Only verified company users with the trusted admin custom claim can list profiles. All other collections are denied by these rules. Admins can read the directory but cannot change roles through the client.
+
+The rules file is local source; this task does not inspect or change the rules currently published in Firebase. Until an operator deploys and verifies these rules in the intended Firebase project, do not assume production Firestore is protected by this file.
+
+## Authentication and authorization lifecycle
+
+1. `AuthProvider` subscribes to Firebase with `onAuthStateChanged` and reports a loading state while Firebase resolves the session.
+2. The web login action uses Firebase Google popup sign-in. The shared `isAuthorizedUser` function trims and lowercases the email, requires a non-empty email and `emailVerified === true`, and then checks `email.endsWith('@hbplus.fit')`. There is no Gmail development exception.
+3. If this client check rejects the account after sign-in, the flow signs the Firebase session out and does not write a profile. This is a user-interface check; Firestore rules repeat server-enforced checks for Firestore access.
+4. After authorization succeeds, `saveUserProfile` reads `users/{uid}`. It creates a missing document with `role: 'user'` and `createdAt: serverTimestamp()`, or merges only the UID/email/profile fields and `lastLoginAt` into an existing document. It never writes a role during an update.
+5. The auth provider loads and validates the profile, then forces an ID-token refresh and derives the effective role only from the trusted `admin === true` custom claim. A missing or malformed profile and token/Firestore errors are surfaced; the provider does not grant Admin when claim verification fails.
+6. The root route sends a signed-out user to `/login`, a regular user to `/user/dashboard`, and an admin to `/admin/dashboard`. Route guards repeat these navigation checks on protected route groups. Firebase Security Rules remain the actual data-access boundary.
+7. Unauthorized Firebase sessions are signed out. Login and logout controls show busy states; errors are displayed instead of being silently ignored.
+
+## Trusted admin provisioning
+
+Admin claims are not created or edited by client code. An operator must first have the intended verified `@hbplus.fit` user sign in so that their profile exists. Then, on a trusted workstation:
+
+1. Install/use the project's dependencies with `npm ci`.
+2. Store a service-account credential file outside the repository, restrict access to it, and grant only the required Firebase Authentication and Firestore IAM permissions.
+3. Set `FIREBASE_PROJECT_ID` to the exact target project and `GOOGLE_APPLICATION_CREDENTIALS` to the external credential path. Never paste the credential JSON into source, `.env`, or a command line.
+4. Grant or revoke the custom claim:
+
+   ```bash
+   node scripts/manage-admin-claim.cjs grant-admin <firebase-auth-uid>
+   node scripts/manage-admin-claim.cjs revoke-admin <firebase-auth-uid>
+   ```
+
+The script requires an existing profile and, for grants, checks that the Firebase Auth account is verified and uses the company domain. It preserves unrelated custom claims and synchronizes the profile's role label. The user must sign out and back in to refresh the ID token. The `role` profile field remains non-authoritative; the custom claim is what the route guard and Firestore rules check. Treat service-account credentials as highly sensitive, keep them out of source control, and review the project's IAM policy before running the script.
+
+## User and admin screens
+
+- The user dashboard reads the authenticated user's Firestore profile and displays profile fields, the effective access role, profile creation time, and last profile login.
+- The admin overview reads the live Firestore profile count and shows the current administrator's claim-backed access state.
+- The admin directory reads user profiles in pages of 50, supports name/email/UID search over loaded pages and role-label filtering, and displays selected profile details.
+- The directory is read-only. There is no status, invitation, deletion, or client-side role-management model or action. Search/filter labels describe profile metadata; they do not prove custom claims for every listed account.
+- The UI uses React Native components rendered by React Native Web, with compact layouts for narrow screens. Expo Router, auth context, profile services, and screens share code; Google auth has platform-specific handling. This task and its browser validation are web-only and do not validate native builds.
+
+## Run, test, and build
+
+### Web development and static export
 
 ```bash
+npx expo start --web
 npx expo export --platform web
 ```
 
-The `web.output` setting in `app.json` is `static`; the export is written to `dist/`.
+The Expo static web export is written to `dist/` (`web.output` is `static` in `app.json`).
 
-### Android and iOS development builds
+### Validation commands
 
-The project has the `expo-dev-client` dependency, Google Sign-In config plugin, and an EAS `development` profile. A development build is required for native Google Sign-In; Expo Go does not include this native module.
+```bash
+npx tsc --noEmit
+npm run lint
+npm run test:unit
+npm run test:rules
+npx playwright install chromium
+npm run test:e2e
+npx expo-doctor
+```
 
-For a local Android build:
+- Unit tests cover the company-email authorization predicate, unauthorized login sign-out/profile-write behavior, logout delegation, and profile creation/update rules.
+- `test:rules` runs against the local Firestore Emulator; it exercises UID ownership, verified company email, immutable roles/timestamps, deletion denial, admin claim listing, and default-deny behavior. It does not deploy rules.
+- Playwright tests cover the login screen and anonymous route redirection. They do not authenticate through a real Google account or prove successful company-account login.
+- `npx expo-doctor` passed all 20/20 checks after dependency updates.
+
+### Android and iOS configuration
+
+The repository retains Android/iOS Expo configuration, EAS profiles, and the native Google Sign-In plugin. Native development builds are supported by the existing configuration, but native authentication/builds are outside the web-only implementation scope here and were not validated as part of this work. Native Google Sign-In requires a development build rather than Expo Go:
 
 ```bash
 npx expo run:android
-```
-
-For a local iOS build (requires macOS and Xcode):
-
-```bash
 npx expo run:ios
 ```
 
-Alternatively, build in the cloud using the configured EAS development profile:
+The iOS command requires macOS and Xcode. Complete the platform-specific OAuth client, signing, and Firebase app configuration before expecting native sign-in to work.
 
-```bash
-npx eas-cli@latest build --profile development --platform android
-npx eas-cli@latest build --profile development --platform ios
-```
+## Netlify deployment
 
-After installing a development build, run `npx expo start` to connect it to the development server. Confirm the Firebase/OAuth platform setup above before expecting native sign-in to work.
+The current site is deployed using manual Netlify Drop:
 
-### Netlify
+1. Build the static web site:
 
-The current deployment uses manual Netlify Drop:
+   ```bash
+   npx expo export --platform web
+   ```
 
-- Build the static web export:
+2. Upload the complete generated `dist/` folder using Netlify Drop.
+3. Confirm `tangerine-tapioca-a65ba5.netlify.app` is an authorized Firebase Authentication domain and is allowed by the Google OAuth web client.
 
-  ```bash
-  npx expo export --platform web
-  ```
+Live site: [https://tangerine-tapioca-a65ba5.netlify.app/](https://tangerine-tapioca-a65ba5.netlify.app/)
 
-- Upload the complete `dist/` folder using Netlify Drop.
+## Validation status and known limitations
 
-The live deployment is [https://tangerine-tapioca-a65ba5.netlify.app/](https://tangerine-tapioca-a65ba5.netlify.app/). Add the deployed hostname to Firebase Authentication's authorized domains and to the relevant Google OAuth web-client configuration.
+- The current revision passed `npx tsc --noEmit`, `npm run lint`, `npm run test:unit` (11 tests), `npm run test:rules` (8 tests), and `npm run test:e2e` (3 browser tests). `npx expo export --platform web` also completed and generated `dist/`; Expo Doctor passed 20/20 checks.
+- Dependency installation reported 49 advisories (44 moderate and 5 high). An `npm audit --omit=dev` attempt could not reach the npm registry because DNS resolution failed, so production dependency advisory status remains unverified.
+- Successful authentication with a verified `@hbplus.fit` company account has not been tested because no company test account was provided.
+- Browser tests do not exercise a signed-in session, Google OAuth popup, logout in an authenticated browser, or claim-backed Admin navigation with a real token.
+- The current Firebase project's published Firestore rules were not inspected or deployed by this work. Deploy and verify `firestore.rules` separately before relying on Firestore access restrictions in production.
+- Firestore profile role labels may be stale if a trusted provisioning operation partially succeeds. The custom claim remains authoritative for access.
+- The application has no custom backend. Client-side checks and route guards can be bypassed and must not be used to protect data or APIs; use Firebase ID-token verification and server-side authorization for any backend, and maintain deployed Firestore rules for Firestore.
+- The profile directory is paginated, but search and role filtering apply to profiles loaded into the browser. Account status and operational audit history are not modeled.
+- No production deployment, Firebase rules deployment, commit, or push was performed as part of this implementation.
 
-## Validation and limitations
+## Security considerations
 
-- `npm run lint` — passed.
-- `npx tsc --noEmit` — passed.
-- `npx expo-doctor` — passed all 20/20 checks after dependency updates.
-- No unit or end-to-end test script or test files are present in the repository. These checks do not exercise Google OAuth or Firebase sign-in.
-- No company test account was provided, so successful `@hbplus.fit` authentication has not been verified.
-- The project has no application backend, role-based authorization, or application database/storage implementation.
-- Email-domain authorization is enforced in client code. It is useful for controlling this UI but is not a server-side security boundary. Any backend or protected data service must independently verify Firebase ID tokens and enforce access rules server-side.
-- Native iOS Google OAuth setup and release signing must be completed for the target environment before an iOS release.
-
-## Security notes
-
-- The Firebase web configuration and OAuth client IDs are included in client-side app configuration. Firebase client configuration is not a service-account credential, but Firebase Authentication and any associated Firebase resources must still be secured with appropriate provider settings and server-side rules.
-- The Google ID token on native is passed to Firebase to create a credential; this app does not implement a custom token store or backend session.
-- Do not commit `.env` files, service-account JSON, private keys, or signing secrets. The client-side email check must not be used in place of server-side authorization.
+- Firebase client configuration and `google-services.json` contain client/project identifiers and are not Firebase Admin credentials. Restrict Firebase resources with provider configuration, IAM, and security rules.
+- Firebase Authentication manages the session and ID tokens. The app does not create its own token store or backend session.
+- Admin authority comes from a Firebase custom claim provisioned by the trusted Admin SDK script. The profile's `role` field is only display/filter metadata.
+- Firestore rules bind profile access to the signed-in UID, require a verified company email for profile writes, prohibit self-role changes and deletes, limit admin access to reads/listing, and deny unmatched collections.
+- Never commit `.env` files, service-account credentials, private keys, signing secrets, or emulator/test artifacts. The `.gitignore` contains patterns for local environment files, common Firebase service-account files, private keys, emulator data, and test output.
+- Email-domain checks in the client are not a substitute for Firebase Security Rules or server-side ID-token verification.

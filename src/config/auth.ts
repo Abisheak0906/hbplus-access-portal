@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 
 import { auth } from './firebase';
+import { saveUserProfile } from '../services/user-profile';
 
 export function isAuthorizedUser(user: User): boolean {
   const email = user.email?.trim().toLowerCase();
@@ -37,6 +38,7 @@ export async function loginWithGoogle(): Promise<User> {
     );
   }
 
+  await saveUserProfile(user);
   return user;
 }
 
@@ -55,6 +57,7 @@ export async function loginWithGoogleIdToken(
     );
   }
 
+  await saveUserProfile(user);
   return user;
 }
 
